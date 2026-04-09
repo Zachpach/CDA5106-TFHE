@@ -15,11 +15,6 @@ using Torus = int32_t;
 // Fixed seed for reproducible runs
 std::mt19937 rng(10);
 
-// A vector of random 0s and 1s, one per dimension
-struct SecretKey {
-    std::vector<int32_t> bits;
-}; 
-
 // RandomMask - public random vector, one Torus value per key bit
 // HiddenValue - the message locked behind the key: <mask,key> + msg + noise
 struct Ciphertext {
@@ -38,12 +33,7 @@ std::string tstr(Torus t) {
     oss << std::fixed << std::setprecision(5) << (double)t / (1LL << 32);
     return oss.str();
 }
- 
-// Returns a uniformly random Torus integer
-Torus randomTorusValue() {
-    return std::uniform_int_distribution<int32_t>(INT32_MIN, INT32_MAX)(rng);
-}
- 
+  
 // Takes an input that controls the maximum size of the noise and returns 
 // a tiny random Torus integer from a Gaussian distribution
 Torus smallNoise(double stddev) {
@@ -51,17 +41,14 @@ Torus smallNoise(double stddev) {
     return toTorus(sample);
 }
  
-
-// Returns a SecretKey with 'dimension' random bits
-SecretKey generateKey(int dimension) {
-    SecretKey key;
-    key.bits.resize(dimension);
-    for (auto& bit : key.bits)
+// Returns a key with 'dimension' random bits
+std::vector<int32_t> generateKey(int dimension) {
+    std::vector<int32_t> key(dimension);
+    for (auto& bit : key)
         bit = std::uniform_int_distribution<int32_t>(0, 1)(rng);
     return key;
 }
  
-
 // Takes the mask and secret key as inputs and returns the dot product of the two.
 Torus dotProduct(const std::vector<Torus>& mask, const std::vector<int32_t>& keyBits) {
     Torus sum = 0;
@@ -82,19 +69,19 @@ int decodeBit(Torus value) {
 }
  
 //   Input:  bit - plaintext bit to hide (0 or 1)
-//           key - SecretKey used to lock the message
+//           key - secret key used to lock the message
 //           noiseLevel - Gaussian noise std-dev
 //   Output: Ciphertext (randomMask[], hiddenValue)
-//   Formula: hiddenValue = <randomMask, key> + encodeBit(bit) + noise
-Ciphertext encrypt(int bit, const SecretKey& key, double noiseLevel) {
+Ciphertext encrypt(int bit, const std::vector<int32_t>& key, double noiseLevel) {
     Ciphertext ct;
-    ct.randomMask.resize(key.bits.size());
-    for (auto& v : ct.randomMask) v = randomTorusValue();
- 
-    Torus keyBinding = dotProduct(ct.randomMask, key.bits);
+    ct.randomMask.resize(key.size());
+    for (auto& v : ct.randomMask) v = std::uniform_int_distribution<int32_t>(INT32_MIN, INT32_MAX)(rng);
+
+    Torus keyBinding = dotProduct(ct.randomMask, key);
     Torus encodedBit = encodeBit(bit);
     Torus securityNoise = smallNoise(noiseLevel);
- 
+
+    //   Formula: hiddenValue = <randomMask, key> + encodeBit(bit) + noise
     ct.hiddenValue = keyBinding + encodedBit + securityNoise;
  
     std::cout << "         bit " << bit << " -> [torus] " << tstr(encodedBit)
@@ -106,11 +93,11 @@ Ciphertext encrypt(int bit, const SecretKey& key, double noiseLevel) {
 }
  
 //   Input:  ct - Ciphertext from encrypt()
-//           key - the same SecretKey used during encryption
+//           key - the same secret key used during encryption
 //   Output: the original plaintext bit (0 or 1)
-//   Formula: strip binding -> encodedBit + noise -> round to nearest
-int decrypt(const Ciphertext& ct, const SecretKey& key) {
-    Torus keyBinding = dotProduct(ct.randomMask, key.bits);
+int decrypt(const Ciphertext& ct, const std::vector<int32_t>& key) {
+    ///  Formula: strip binding -> encodedBit + noise -> round to nearest
+    Torus keyBinding = dotProduct(ct.randomMask, key);
     Torus encodedPlusNoise = ct.hiddenValue - keyBinding;
     int result = decodeBit(encodedPlusNoise);
  
@@ -125,39 +112,37 @@ int decrypt(const Ciphertext& ct, const SecretKey& key) {
 //   Input:  ct1 - Ciphertext encrypting bit x
 //           ct2 - Ciphertext encrypting bit y
 //   Output: Ciphertext encrypting NAND(x, y)  - no key used
-//   Formula: output = (5/8) - ct1 - ct2
 Ciphertext homNAND(const Ciphertext& ct1, const Ciphertext& ct2) {
     Ciphertext output;
     output.randomMask.resize(ct1.randomMask.size());
     for (int i = 0; i < (int)ct1.randomMask.size(); i++)
         output.randomMask[i] = -ct1.randomMask[i] - ct2.randomMask[i];
- 
+
+    //   Formula: output = (5/8) - ct1 - ct2
     output.hiddenValue = toTorus(5.0 / 8.0) - ct1.hiddenValue - ct2.hiddenValue;
  
     return output;
 }
  
 // MULTI-USER FEATURE
-
 // Random shares of the key for first N-1 users
-std::vector<std::vector<int32_t>> splitKey(const SecretKey& master, int numUsers) {
-    int dim = master.bits.size();
+std::vector<std::vector<int32_t>> splitKey(const std::vector<int32_t>& master, int numUsers) {
+    int dim = master.size();
     std::vector<std::vector<int32_t>> shares(numUsers, std::vector<int32_t>(dim, 0));
- 
+
     for (int i = 0; i < numUsers - 1; i++)
         for (int j = 0; j < dim; j++)
             shares[i][j] = std::uniform_int_distribution<int32_t>(0, 1)(rng);
- 
+
     // Last share absorbs remainder so all shares sum to master
     for (int j = 0; j < dim; j++) {
         int sum = 0;
         for (int i = 0; i < numUsers - 1; i++) sum += shares[i][j];
-        shares[numUsers - 1][j] = master.bits[j] - sum;
+        shares[numUsers - 1][j] = master[j] - sum;
     }
     return shares;
 }
  
-
 // Summing all results reconstructs the full key binding.
 // Subtracting from hiddenValue recovers the original bit.
 int combinePartials(const Ciphertext& ct,
@@ -168,8 +153,6 @@ int combinePartials(const Ciphertext& ct,
     return decodeBit(ct.hiddenValue - fullBinding);
 }
  
-void divider() { std::cout << std::string(50, '-') << "\n\n"; }
-
 // MAIN FUNCTION 
 int main() {
 
@@ -184,11 +167,11 @@ int main() {
     for (int b : INPUT) std::cout << b << " ";
     std::cout << "]\n";
 
-    SecretKey key = generateKey(KEY_DIMENSION);
+    auto key = generateKey(KEY_DIMENSION);
     std::cout << "SECRET KEY: [ ";
-    for (int b : key.bits) std::cout << b << " ";
+    for (int b : key) std::cout << b << " ";
     std::cout << "]\n";
-    divider();
+    std::cout << std::string(50, '-') << "\n\n";
  
     // Encrypt / Decrypt 
     std::cout << "ENCRYPT -> DECRYPT\n";
@@ -201,7 +184,7 @@ int main() {
         std::cout << "    " << bit << " -> " << recovered
                   << (recovered == bit ? "  PASS" : "  FAIL") << "\n\n";
     }
-    divider();
+    std::cout << std::string(50, '-') << "\n\n";
  
     // Homomorphic NAND 
     std::cout << "HOMOMORPHIC NAND GATE\n"; 
@@ -224,7 +207,7 @@ int main() {
                       << (got == expected ? "  PASS" : "  FAIL") << "\n\n";
         }
     }
-    divider();
+    std::cout << std::string(50, '-') << "\n\n";
  
     // Multi-user decryption
     const int NUM_USERS = 3;
