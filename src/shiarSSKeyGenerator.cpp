@@ -4,14 +4,16 @@
 #include <bits/stdc++.h>
 using namespace std;
 
+typedef long int64;
+
 // Function to calculate the value
 // of y
 // y = poly[0] + x*poly[1] + x^2*poly[2] + ...
-int calculate_Y(int x, vector<int>& poly)
+int64 calculate_Y(int64 x, vector<int64>& poly)
 {
     // Initializing y
-    int y = 0;
-    int temp = 1;
+    int64 y = 0;
+    int64 temp = 1;
 
     // Iterating through the array
     for (auto coeff : poly) {
@@ -26,12 +28,12 @@ int calculate_Y(int x, vector<int>& poly)
 // Function to perform the secret
 // sharing algorithm and encode the
 // given secret
-void secret_sharing(int S, vector<pair<int, int> >& points,
-                    int N, int K)
+void secret_sharing(int64 S, vector<pair<int64, long> >& points,
+                    int64 N, int64 K)
 {
     // A vector to store the polynomial
     // coefficient of K-1 degree
-    vector<int> poly(K);
+    vector<int64> poly(K);
 
     // Randomly choose K - 1 numbers but
     // not zero and poly[0] is the secret
@@ -39,8 +41,8 @@ void secret_sharing(int S, vector<pair<int, int> >& points,
 
     poly[0] = S;
 
-    for (int j = 1; j < K; ++j) {
-        int p = 0;
+    for (int64 j = 1; j < K; ++j) {
+        int64 p = 0;
         while (p == 0)
 
             // To keep the random values
@@ -57,9 +59,9 @@ void secret_sharing(int S, vector<pair<int, int> >& points,
 
     // Generating N points from the
     // polynomial we created
-    for (int j = 1; j <= N; ++j) {
-        int x = j;
-        int y = calculate_Y(x, poly);
+    for (int64 j = 1; j <= N; ++j) {
+        int64 x = j;
+        int64 y = calculate_Y(x, poly);
 
         // Points created on sharing
         points[j - 1] = { x, y };
@@ -70,11 +72,11 @@ void secret_sharing(int S, vector<pair<int, int> >& points,
 // part handling multiplication
 // and addition of fraction
 struct fraction {
-    int num, den;
+    int64 num, den;
 
     // A fraction consists of a
     // numerator and a denominator
-    fraction(int n, int d)
+    fraction(int64 n, int64 d)
     {
         num = n, den = d;
     }
@@ -85,7 +87,7 @@ struct fraction {
     // them with their GCD
     void reduce_fraction(fraction& f)
     {
-        int gcd = __gcd(f.num, f.den);
+        int64 gcd = __gcd(f.num, f.den);
         f.num /= gcd, f.den /= gcd;
     }
 
@@ -116,18 +118,18 @@ struct fraction {
 // Instead of finding the complete Polynomial
 // We only required the poly[0] as our secret code,
 // thus we can get rid of x terms
-int Generate_Secret(int x[], int y[], int M)
+int64 Generate_Secret(int64 x[], int64 y[], int64 M)
 {
 
     fraction ans(0, 1);
 
     // Loop to iterate through the given
     // points
-    for (int i = 0; i < M; ++i) {
+    for (int64 i = 0; i < M; ++i) {
 
         // Initializing the fraction
         fraction l(y[i], 1);
-        for (int j = 0; j < M; ++j) {
+        for (int64 j = 0; j < M; ++j) {
 
             // Computing the lagrange terms
             if (i != j) {
@@ -145,29 +147,29 @@ int Generate_Secret(int x[], int y[], int M)
 // Function to encode and decode the
 // given secret by using the above
 // defined functions
-void operation(int S, int N, int K)
+int64 operation(int S, int N, int K)
 {
 
     // Vector to store the points
-    vector<pair<int, int> > points(N);
+    vector<pair<int64, long> > points(N);
 
     // Sharing of secret Code in N parts
     secret_sharing(S, points, N, K);
 
-    cout << "Secret is divided to " << N
-         << " Parts - " << endl;
+    // cout << "Secret is divided to " << N
+    //      << " Parts - " << endl;
 
-    for (int i = 0; i < N; ++i) {
-        cout << points[i].first << " "
-             << points[i].second << endl;
-    }
+    // for (uint64 i = 0; i < N; ++i) {
+    //     cout << points[i].first << " "
+    //          << points[i].second << endl;
+    // }
 
-    cout << "We can generate Secret from any of "
-         << K << " Parts" << endl;
+    // cout << "We can generate Secret from any of "
+    //      << K << " Parts" << endl;
 
     // Input any M points from these
     // to get back our secret code.
-    int M = 2;
+    int M = K;
 
     // M can be greater than or equal to threshold but
     // for this example we are taking for threshold
@@ -176,31 +178,53 @@ void operation(int S, int N, int K)
              << K << " Points Required" << endl;
     }
 
-    int* x = new int[M];
-    int* y = new int[M];
+    auto* x = new int64[M];
+    auto* y = new int64[M];
 
     // Input M points you will get the secret
     // Let these points are first M points from
     // the N points which we shared above
     // We can take any M points
 
-    for (int i = 0; i < M; ++i) {
+    for (int64 i = 0; i < M; ++i) {
         x[i] = points[i].first;
         y[i] = points[i].second;
     }
 
     // Get back our result again.
-    cout << "Our Secret Code is : "
-         << Generate_Secret(x, y, M) << endl;
+    // cout << "Our Secret Code is: "
+    //      << Generate_Secret(x, y, M) << endl;
+
+    int64 reconstructedSecret = Generate_Secret(x, y, M);
+
+    delete[] x;
+    delete[] y;
+    return reconstructedSecret;
 }
 
 // Driver Code
 int main()
 {
-    int S = 65;
-    int N = 4;
-    int K = 2;
 
-    operation(S, N, K);
+    std::srand(static_cast<unsigned int>(std::time(nullptr)));
+    int num = 0;
+
+    for (int i = 0; i < 500; ++i) {
+        int S = std::rand();
+        int N = (std::rand() % 50) + 3;
+        int K = 2;
+
+        // cout << "Secret: " << S << endl;
+
+        int reconstructed = operation(S, N, K);
+
+        if (reconstructed == S) {
+            num++;
+        }
+        cout << "Result:\t\t" << (reconstructed == S)  << "\t(" << S << "," << reconstructed << ")\t("<< N << "," << K << ")" << endl;
+    }
+
+    cout << "Final: " << num << endl;
+
     return 0;
 }
