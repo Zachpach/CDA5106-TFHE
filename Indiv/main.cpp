@@ -116,7 +116,6 @@ Ciphertext homNAND(const Ciphertext& a, const Ciphertext& b)
 // MAIN
 int main() 
 {
-
     const int KEY_DIMENSION = 16;
     const double NOISE_STDDEV = 1.0 / (1 << 10);
     const int INPUT[4] = {0, 1, 0, 0};
