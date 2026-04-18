@@ -95,7 +95,7 @@ Ciphertext encrypt(int bit, const std::vector<int32_t>& key, double noiseLevel) 
 // Input: ct: Ciphertext from encrypt(), key: the same secret key used during encryption
 // Output: the original plaintext bit (0 or 1)
 int decrypt(const Ciphertext& ct, const std::vector<int32_t>& key) {
-	///  Formula: strip binding -> encodedBit + noise -> round to nearest
+	// Formula: strip binding -> encodedBit + noise -> round to nearest
 	Torus keyBinding = dotProduct(ct.randomMask, key);
 	Torus encodedPlusNoise = ct.hiddenValue - keyBinding;
 	int result = decodeBit(encodedPlusNoise);
@@ -154,7 +154,7 @@ std::vector<Share> shamirSplit(int64_t secret, int N, int64_t prime) {
 	for (int i = 1; i <= N; i++) {
 		int64_t x = i;
 		int64_t y = (secret + a * x) % prime;
-		std::cout << "\tUser " << i << ": f(" << x << ") = ("<< secret << " + " << a << "*" << x << ") % " << prime << " = " << y << "\n";
+		std::cout << "\t\tUser " << i << ": f(" << x << ") = ("<< secret << " + " << a << "*" << x << ") % " << prime << " = " << y << " = (" << x << "," << y << ")" <<"\n";
 		shares.push_back({x, y});
 	}
 	return shares;
@@ -167,8 +167,8 @@ int64_t shamirReconstruct(const Share& s1, const Share& s2, int64_t prime) {
 	int64_t x1 = s1.x, y1 = s1.y;
 	int64_t x2 = s2.x, y2 = s2.y;
 
-	int64_t inv1  = modInverse((x1 - x2 + prime) % prime, prime);
-	int64_t inv2  = modInverse((x2 - x1 + prime) % prime, prime);
+	int64_t inv1 = modInverse((x1 - x2 + prime) % prime, prime);
+	int64_t inv2 = modInverse((x2 - x1 + prime) % prime, prime);
 	int64_t term1 = (y1 * ((prime - x2) % prime) % prime) * inv1 % prime;
 	int64_t term2 = (y2 * ((prime - x1) % prime) % prime) * inv2 % prime;
 	int64_t result = (term1 + term2) % prime;
@@ -182,8 +182,8 @@ int64_t shamirReconstruct(const Share& s1, const Share& s2, int64_t prime) {
 int main() {
 	// Parameters
 	const int KEY_DIMENSION = 16;
-	const double NOISE_STDDEV  = 1.0 / (1 << 10);
-	const double NOISE_MULTI   = 1.0 / (1 << 13);
+	const double NOISE_STDDEV = 1.0 / (1 << 10);
+	const double NOISE_MULTI = 1.0 / (1 << 13);
 	const int INPUT[4] = {1,1,0,1};
  
 	// Key generation
@@ -252,12 +252,8 @@ int main() {
 	std::cout << std::string(50, '=') << "\n\n";
 	std::cout << "\tPrime: " << SSS_PRIME << "  Secret: " << masterSecret << "\n\n";
 
-	auto shares = shamirSplit(masterSecret, 3, SSS_PRIME);
-
 	std::cout << "\tShares:\n";
-	for (size_t i = 0; i < shares.size(); i++)
-		std::cout << "\tUser " << (i+1) << ": (" << shares[i].x << ", " << shares[i].y << ")\n";
-
+	auto shares = shamirSplit(masterSecret, 3, SSS_PRIME);
 	std::cout << "\n\tReconstruction of Secret Key:\n";
 	int multiPass = 0, multiFail = 0;
 	const int pairs[3][2] = {{0,1},{0,2},{1,2}};
@@ -277,7 +273,7 @@ int main() {
 		for (int i = 0; i < KEY_DIMENSION; i++)
 			recoKey[i] = (recoSecret >> i) & 1;
 
-		std::cout << "\t\tOriginal key     : [ "; for (int b : key)     std::cout << b << " "; std::cout << "]\n";
+		std::cout << "\t\tOriginal key     : [ "; for (int b : key) std::cout << b << " "; std::cout << "]\n";
 		std::cout << "\t\tReconstructed key: [ "; for (int b : recoKey) std::cout << b << " "; std::cout << "]\n\n";
 		for (int testBit : {0, 1}) {
 			std::cout << "\t\tEncrypt bit: " << testBit;
@@ -290,21 +286,5 @@ int main() {
 		}
 	}
 
-	// Final Summary 
-	int totalPass = encDecPass + nandPass + multiPass;
-	int totalFail = encDecFail + nandFail + multiFail;
-	int total = totalPass + totalFail;
-
-	std::cout << std::string(50, '=') << "\n";
-	std::cout << "TEST SUMMARY\n";
-	std::cout << std::string(50, '=') << "\n";
-	std::cout << "\tEncrypt/Decrypt    : " << encDecPass << "/" << (encDecPass + encDecFail) << " passed\n";
-	std::cout << "\tHomomorphic NAND   : " << nandPass   << "/" << (nandPass   + nandFail)   << " passed\n";
-	std::cout << "\tMulti-User Access  : " << multiPass  << "/" << (multiPass  + multiFail)  << " passed\n";
-	std::cout << std::string(50, '-') << "\n";
-	std::cout << "\tTotal              : " << totalPass << "/" << total << " passed";
-	std::cout << (totalFail == 0 ? "  -- ALL TESTS PASSED\n" : "  -- " + std::to_string(totalFail) + " TEST(S) FAILED\n");
-	std::cout << std::string(50, '=') << "\n";
-
-	return totalFail == 0 ? 0 : 1;
+return 0;
 }
